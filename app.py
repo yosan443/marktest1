@@ -2,40 +2,49 @@ import cv2
 import numpy as np
 from PIL import Image
 
-# 楕円検出を行う関数
+# 楕円検出
 def detect_ellipses(image_path, min_size, max_size):
     # 画像を読み込む
     image = cv2.imread(image_path)
+
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+# 色の範囲を定義
+    lower_color1 = np.array([0, 50, 50])
+    upper_color1 = np.array([10, 255, 255])
+    lower_color2 = np.array([170, 50, 50])
+    upper_color2 = np.array([180, 255, 255])
+
+# 二値化準備
+    mask1 = cv2.inRange(hsv, lower_color1, upper_color1)
+    mask2 = cv2.inRange(hsv, lower_color2, upper_color2)
+    mask = cv2.bitwise_or(mask1, mask2)
+
+# 二値化
+    result = cv2.bitwise_and(image, image, mask=mask)
     
     # グレイスケール化
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    # ガウシアンブラーを適用してノイズを除去
+    # ガウシアンブラー
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     
     # エッジ検出
-    edges = cv2.Canny(blurred, 50, 150)
+    edges = cv2.Canny(result, 50, 150)
     
     # 輪郭検出
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     ellipses = []
     for contour in contours:
-        if len(contour) >= 5:  # 楕円フィッティングには最低5点必要
+        if len(contour) >= 5:  # 楕円フィッティングinit
             ellipse = cv2.fitEllipse(contour)
-            (center, axes, angle) = ellipse
-            
-            # 楕円の長軸と短軸を取得
-            major_axis = max(axes)
-            minor_axis = min(axes)
-            
-            # サイズ範囲内の楕円のみを抽出
-            if min_size <= major_axis <= max_size and min_size <= minor_axis <= max_size:
-                ellipses.append(ellipse)
+            if ellipse[1][0] > 0 and ellipse[1][1] > 0:  # 楕円の幅と高さが正の値
+                cv2.ellipse(image, ellipse, (0, 255, 0), 2)
     
     return ellipses, image
 
-# レイヤーを作成する関数
+# レイヤー作成
 def create_layer(image, ellipses):
     layer = np.zeros_like(image)
     
@@ -44,7 +53,7 @@ def create_layer(image, ellipses):
     
     return layer
 
-# 変化を検出する関数
+# 変化を検出
 def detect_changes(image1, image2, layer):
     # レイヤーを適用
     masked_image1 = cv2.bitwise_and(image1, layer)
@@ -59,12 +68,12 @@ def detect_changes(image1, image2, layer):
 
 # メイン処理
 def main():
-    image1_path = 'base1.jpg'
+    image1_path = 'base2.jpg'
     image2_path = 'test2.png'
     
     # 楕円検出のサイズ範囲を指定（ピクセル単位）
-    min_size = 17  # 最小サイズ
-    max_size = 50  # 最大サイズ
+    min_size = 0  # 最小サイズ
+    max_size = 1000  # 最大サイズ
     
     # 楕円検出
     ellipses, image1 = detect_ellipses(image1_path, min_size, max_size)
